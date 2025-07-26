@@ -1,6 +1,6 @@
 services:
   source_postgres:
-    image: postgres:latest
+    image: postgres:9.2
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
@@ -13,7 +13,7 @@ services:
       - elt_network
     
   destination_postgres:
-    image: postgres:latest
+    image: postgres:9.2
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
