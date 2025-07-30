@@ -48,7 +48,7 @@ services:
       - elt_network
     volumes:
       - ./custom_postgres:/dbt
-      - /home/sourabh7iwari/.dbt:/root
+      - /home/sourabh7iwari/.dbt:/root  # ~/.dbt ddidn't work, so using absolute path 
     depends_on:
       elt_script:
         condition: service_completed_successfully 
