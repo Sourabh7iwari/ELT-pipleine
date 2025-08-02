@@ -1,6 +1,6 @@
 services:
   source_postgres:
-    image: postgres:9.2
+    image: postgres:15
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
@@ -13,7 +13,7 @@ services:
       - elt_network
     
   destination_postgres:
-    image: postgres:9.2
+    image: postgres:15
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
@@ -23,38 +23,87 @@ services:
     networks:
       - elt_network
     
-  elt_script:
-    build:
-      context: ./elt
-      dockerfile: Dockerfile
-    command: ["python", "elt_script.py"]
-    networks:
-      - elt_network
-    depends_on:
-      - source_postgres
-      - destination_postgres
-  
-  dbt:
-    image: ghcr.io/dbt-labs/dbt-postgres:1.4.7
-    command: 
-      [
-        "run",
-        "--profiles-dir",
-        "/root",
-        "--project-dir",
-        "/dbt"
-      ]
-    networks:
-      - elt_network
-    volumes:
-      - ./custom_postgres:/dbt
-      - /home/sourabh7iwari/.dbt:/root  # ~/.dbt ddidn't work, so using absolute path 
-    depends_on:
-      elt_script:
-        condition: service_completed_successfully 
+  #elt_script:
+  #  build:
+  #    context: ./elt
+  #    dockerfile: Dockerfile
+  #  command: ["python", "elt_script.py"]
+  #  networks:
+  #    - elt_network
+  #  depends_on:
+  #    - source_postgres
+  #    - destination_postgres
+  #
+  #dbt:
+  #  image: ghcr.io/dbt-labs/dbt-postgres:1.4.7
+  #  command: 
+  #    [
+  #      "run",
+  #      "--profiles-dir",
+  #      "/root",
+  #      "--project-dir",
+  #      "/dbt"
+  #    ]
+  #  networks:
+  #    - elt_network
+  #  volumes:
+  #    - ./custom_postgres:/dbt
+  #    - /home/sourabh7iwari/.dbt:/root  # ~/.dbt ddidn't work, so using absolute path
+  #  depends_on:
+  #    elt_script:
+  #      condition: service_completed_successfully 
+  #  environment:
+  #    DBT_PROFILES: default
+  #    DBT_TARGET: dev
+
+
+  postgres:
+    image: postgres:15
     environment:
-      DBT_PROFILES: default
-      DBT_TARGET: dev
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    networks:
+      - elt_network
+  
+  init-airflow:
+    image: apache/airflow:latest
+    depends_on:
+      - postgres
+    networks:
+      - elt_network
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    command: >
+      bash -c "airflow db migrate && 
+              airflow users create --username airflow  --password password --firstname John --lastname doe --role Admin --email admin@example.com"
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    depends_on:
+      - postgres
+    networks:
+      - elt_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./elt:/opt/airflow/elt
+      - ./custom_postgres:/opt/dbt
+      - /home/sourabh7iwari/.dbt:/root/.dbt
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - LOAD_EX=n
+      - EXECUTOR=Local
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=zwD1Nye8TUxmY1Z4KrC_KZQZy7ozdSv0FwrVnbheo9Y=
+      - AIRFLOW__API__SECRET_KEY=secret
+    ports:
+      - "8081:8080"
+    command: scheduler
 
 
 networks:
