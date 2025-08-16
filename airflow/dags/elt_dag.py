@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from docker.types import Mount
+
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.bash import BashOperator
+
 from airflow.providers.docker.operators.docker import DockerOperator
 import subprocess
 
@@ -41,21 +43,23 @@ t2 =  DockerOperator(
     task_id = "dbt_run",
     image = 'ghcr.io/dbt-labs/dbt-postgres:1.4.7',
     command=[
-        "run",
+       "run",
         "--profiles-dir",
         "/root",
         "--project-dir",
-        "/dbt"
+        "/dbt",
+        "--full-refresh"
     ],
     auto_remove=True,
     docker_url="unix://var/run/docker.sock",
-    network_mode="bridge",
     mounts=[
         Mount(source='/home/sourabh7iwari/Repository/elt/custom_postgres',
               target='/dbt', type='bind'),
         Mount(source='/home/sourabh7iwari/.dbt',
               target='/root', type='bind')
     ],
+    network_mode="elt_elt_network",
+    mount_tmp_dir=False,
     dag=dag
 )
 
